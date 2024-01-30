@@ -1,0 +1,74 @@
+{% from 'bootstrap5/form.html' import render_form %} 
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Add Stock</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+        }
+
+        form {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin: 0;
+            text-align: center;
+        }
+
+        header {
+            position: relative;
+            margin-bottom: 3rem;
+            padding-top: 8rem;
+            padding-bottom: 8rem;
+            background: url('../static/img/background.jpg') no-repeat center center;
+            background-size: cover;
+        }
+
+        header:before {
+            content: "";
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            opacity: 0.5;
+        }
+    </style>
+
+    <!-- Custom styles for this template-->
+    <link href="{{ url_for('static', filename='css/sb-admin-2.min.css') }}" rel="stylesheet">
+</head>
+
+<body>
+    <!-- Page Heading -->
+    <div class="d-sm-flex align-items-center justify-content-between mb-4">
+        <a href="{{ url_for('home', current_year= current_year) }}" class="btn btn-secondary btn-icon-split btn-lg">
+            <span class="text">Home</span>
+        </a>
+    </div>
+    
+
+    <!-- Main Content-->
+    <div class="container px-4 px-lg-5">
+        <div class="row gx-4 gx-lg-5 justify-content-center">
+            <div class="col-md-10 col-lg-8 col-xl-7">           
+                    {{ render_form(form) }}
+            </div>
+        </div>
+    </div>
+
+    <!-- Footer -->
+    <footer class="sticky-footer bg-white">
+        <div class="container my-auto">
+            <div class="copyright text-center my-auto">
+                <span>Copyright &copy; Stocks Website {{ current_year }}</span>
+            </div>
+        </div>
+    </footer>
+    <!-- End of Footer -->
+</body>
+</html>
