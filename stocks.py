@@ -8,7 +8,7 @@ import os
 from datetime import datetime
 from sqlalchemy.exc import IntegrityError
 
-API_ACCESS_KEY = 'adba1eee0cccb6fce2f2caa5902d6da1'
+API_ACCESS_KEY = 'YOUR_API_KEY'
 current_year = datetime.now().year
 
 app = Flask(__name__)
