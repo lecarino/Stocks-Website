@@ -1,12 +1,14 @@
 import requests
-from flask import Flask , render_template, redirect, url_for, request
+from flask import Flask , render_template, redirect, url_for, request, flash
 from flask_bootstrap import Bootstrap5
 from flask_sqlalchemy import SQLAlchemy
-from sqlalchemy import Column, Integer, String, Float, Date
+from sqlalchemy import Column, Integer, String, Float, Date, ForeignKey
 from form import StockForm
 import os
 from datetime import datetime
 from sqlalchemy.exc import IntegrityError
+from werkzeug.security import generate_password_hash, check_password_hash
+from flask_login import UserMixin, login_user, LoginManager, current_user, logout_user, login_required
 
 API_ACCESS_KEY = 'YOUR_API_KEY'
 current_year = datetime.now().year
@@ -20,8 +22,17 @@ app.config['SQLALCHEMY_DATABASE_URI'] = os.environ.get("DB_URI", 'sqlite:///stoc
 db = SQLAlchemy()
 db.init_app(app)
 
+login_manager = LoginManager()
+login_manager.init_app(app)
+
+#Create a user_loader callback
+@login_manager.user_loader
+def load_user(user_id):
+    return db.get_or_404(User, user_id)
+
 # Define the Book model
 class Stock(db.Model):
+    __tablename__ = 'stocks'
     id = Column(Integer, primary_key=True)
     symbol = Column(String(250), unique=True, nullable=False)
     open = Column(Float)
@@ -32,15 +43,78 @@ class Stock(db.Model):
     exchange = Column(String(250))
     date = Column(Date)
 
+    # Define the foreign key constraint for the user_id column
+    user_id = Column(Integer, ForeignKey('users.id'), nullable=False)
+    # Define the relationship with the User table
+    user = db.relationship('User', back_populates='stocks')
+
+# TODO: Create a User table for all your registered users. 
+class User(UserMixin, db.Model):
+    __tablename__ = 'users'
+    id = Column(Integer, primary_key = True)
+    email = Column(String(100), unique= True)
+    password = Column(String(100))
+    name = Column(String(100))
+    stocks = db.relationship('Stock', back_populates='user')
+
 #Create DB Tables
 with app.app_context():
     db.create_all()
 
 @app.route("/")
 def home():
-    result = db.session.execute(db.select(Stock))
-    stocks = result.scalars().all()
-    return render_template("index.html", stocks_data=stocks, current_year= current_year)
+    if current_user.is_authenticated:
+        result = db.session.execute(db.select(Stock))
+        stocks = result.scalars().all()
+        return render_template("index.html", stocks_data=stocks, current_year= current_year)
+    else:
+        return redirect(url_for('login'))
+
+@app.route('/register', methods= ['GET', 'POST'])
+def register():
+    if request.method == "POST":
+        result = db.session.execute(db.select(User).where(User.email == request.form.email.data))
+        user= result.scalar()
+
+        if user:
+            flash("You've already signed up with that email, log in instead!")
+            return redirect(url_for('login'))
+        
+        #HASH AND SALT PASSWORD 
+        hash_and_salted_password = generate_password_hash(
+            request.form.password.data,
+            method='pbkdf2:sha256',
+            salt_length=8
+        )
+
+        new_user = User(
+            email = request.form.email.data,
+            name=request.form.name.data,
+            password=hash_and_salted_password,
+        )
+
+        db.session.add(new_user)
+        db.session.commit()
+        return redirect(url_for('home'))
+    return render_template("register.html")
+
+
+@app.route('/login', methods=["GET", "POST"])
+def login():
+    if request.method == "POST":
+        email = request.form.get('email')
+        password = request.form.get('password')
+
+        # Find user by email entered.
+        result = db.session.execute(db.select(User).where(User.email == email))
+        user = result.scalar()
+
+        # Check stored password hash against entered password hashed.
+        if check_password_hash(user.password, password):
+            login_user(user)
+            return redirect(url_for('home'))
+        
+    return render_template("login.html")
 
 @app.route('/add_stock', methods=['GET', 'POST'])
 def add_stock():
@@ -86,5 +160,5 @@ def delete():
     return redirect(url_for('home', current_year= current_year))
 
 if __name__ == "__main__":
-    app.run(debug=True)
+    app.run(port= 5001, debug=True)
     
