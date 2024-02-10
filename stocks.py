@@ -10,7 +10,7 @@ from sqlalchemy.exc import IntegrityError
 from werkzeug.security import generate_password_hash, check_password_hash
 from flask_login import UserMixin, login_user, LoginManager, current_user, logout_user, login_required
 
-API_ACCESS_KEY = 'YOUR_API_KEY'
+API_ACCESS_KEY = 'UR OWN KEY'
 current_year = datetime.now().year
 
 app = Flask(__name__)
@@ -30,7 +30,7 @@ login_manager.init_app(app)
 def load_user(user_id):
     return db.get_or_404(User, user_id)
 
-# Define the Book model
+# Define the Stock model
 class Stock(db.Model):
     __tablename__ = 'stocks'
     id = Column(Integer, primary_key=True)
@@ -54,7 +54,9 @@ class User(UserMixin, db.Model):
     id = Column(Integer, primary_key = True)
     email = Column(String(100), unique= True)
     password = Column(String(100))
-    name = Column(String(100))
+    # Should add repeat password?
+    fname = Column(String(100))
+    lname = Column(String(100))
     stocks = db.relationship('Stock', back_populates='user')
 
 #Create DB Tables
@@ -64,17 +66,18 @@ with app.app_context():
 @app.route("/")
 def home():
     if current_user.is_authenticated:
-        result = db.session.execute(db.select(Stock))
+        result = db.session.execute(db.select(Stock).where(Stock.user_id == current_user.id))
         stocks = result.scalars().all()
-        return render_template("index.html", stocks_data=stocks, current_year= current_year)
-    else:
-        return redirect(url_for('login'))
+        return render_template("index.html", stocks_data=stocks, current_year= current_year, user_name = current_user.fname)
+    return redirect(url_for('login'))
+    
 
 @app.route('/register', methods= ['GET', 'POST'])
 def register():
     if request.method == "POST":
-        result = db.session.execute(db.select(User).where(User.email == request.form.email.data))
-        user= result.scalar()
+        email = request.form.get("email")
+        result = db.session.execute(db.select(User).where(User.email == email))
+        user = result.scalar()
 
         if user:
             flash("You've already signed up with that email, log in instead!")
@@ -82,20 +85,25 @@ def register():
         
         #HASH AND SALT PASSWORD 
         hash_and_salted_password = generate_password_hash(
-            request.form.password.data,
+            request.form.get("password"),
             method='pbkdf2:sha256',
             salt_length=8
         )
 
         new_user = User(
-            email = request.form.email.data,
-            name=request.form.name.data,
-            password=hash_and_salted_password,
+            email = request.form.get("email"),
+            fname =request.form.get("fname"),
+            lname =request.form.get("lname"),
+            password =hash_and_salted_password,
         )
-
+    
         db.session.add(new_user)
         db.session.commit()
-        return redirect(url_for('home'))
+
+        # Log in and authenticate user after adding details to database.
+        login_user(new_user)
+
+        return redirect(url_for('home', user_name = new_user.fname))
     return render_template("register.html")
 
 
@@ -105,18 +113,29 @@ def login():
         email = request.form.get('email')
         password = request.form.get('password')
 
-        # Find user by email entered.
+       
         result = db.session.execute(db.select(User).where(User.email == email))
         user = result.scalar()
-
-        # Check stored password hash against entered password hashed.
-        if check_password_hash(user.password, password):
+        
+        if not user:
+            flash("That email does not exist")
+            return redirect(url_for('login'))
+        elif not check_password_hash(user.password, password):
+            flash("Incorrect password try again")
+        else:
             login_user(user)
-            return redirect(url_for('home'))
+            return redirect(url_for('home', user_name = current_user.fname))
         
     return render_template("login.html")
 
+@app.route('/logout')
+@login_required
+def logout():
+    logout_user()
+    return redirect(url_for('home'))
+
 @app.route('/add_stock', methods=['GET', 'POST'])
+@login_required
 def add_stock():
     form = StockForm()
     if form.validate_on_submit():
@@ -137,7 +156,8 @@ def add_stock():
                     close=stock_data['close'],
                     volume=int(stock_data['volume']),
                     exchange=stock_data['exchange'],
-                    date=datetime.strptime(stock_data['date'], "%Y-%m-%dT%H:%M:%S%z").date()
+                    date=datetime.strptime(stock_data['date'], "%Y-%m-%dT%H:%M:%S%z").date(),
+                    user_id= current_user.id 
                 )
                 db.session.add(stock)
                 db.session.commit()
