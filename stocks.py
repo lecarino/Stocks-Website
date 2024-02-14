@@ -65,11 +65,12 @@ with app.app_context():
 
 @app.route("/")
 def home():
-    if current_user.is_authenticated:
-        result = db.session.execute(db.select(Stock).where(Stock.user_id == current_user.id))
-        stocks = result.scalars().all()
-        return render_template("index.html", stocks_data=stocks, current_year= current_year, user_name = current_user.fname)
-    return redirect(url_for('login'))
+    
+    # if current_user.is_authenticated:
+    #     result = db.session.execute(db.select(Stock).where(Stock.user_id == current_user.id))
+    #     stocks = result.scalars().all()
+    #     return render_template("index.html", stocks_data=stocks, current_year= current_year, user_name = current_user.fname)
+    return render_template('login.html')
     
 
 @app.route('/register', methods= ['GET', 'POST'])
@@ -125,7 +126,6 @@ def login():
         else:
             login_user(user)
             return redirect(url_for('home', user_name = current_user.fname))
-        
     return render_template("login.html")
 
 @app.route('/logout')
@@ -180,5 +180,5 @@ def delete():
     return redirect(url_for('home', current_year= current_year))
 
 if __name__ == "__main__":
-    app.run(port= 5001, debug=True)
+    app.run(port=5003,debug=True)
     
